@@ -16,7 +16,6 @@ class MainWindow(QMainWindow):
         self.ui.setupUi(self)
 
         self.ui.pushButton_3.clicked.connect(self.show_info_popup)
-        self.ui.pushButton_4.clicked.connect(self.show_confirmation_popup)
 
         self.ui.pushButton.clicked.connect(self.start_firewall)
         self.ui.pushButton_2.clicked.connect(self.stop_firewall)
@@ -44,5 +43,3 @@ class MainWindow(QMainWindow):
     def show_info_popup(self):
         QMessageBox.information(self, "Rules Set", "All the defined rules will get shown here.")
 
-    def show_confirmation_popup(self):
-        QMessageBox.question(self, "Confirm Action", "Are you sure you want to clear all logs ?", QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No)

@@ -126,6 +126,8 @@ class MainWindowExtended(MainWindow):
         # Connect signals
         self.firewall_signals.log_added.connect(self.update_logs)
         self.ui.pushButton_5.clicked.connect(self.add_rule)
+
+        self.ui.pushButton_4.clicked.connect(self.confirmation_yes_or_no)
         
     def start_firewall(self):
         super().start_firewall()    #Updates the button to enabled amd disabled mode
@@ -153,6 +155,13 @@ class MainWindowExtended(MainWindow):
         
     def update_logs(self, message):
         self.ui.logsView.appendPlainText(message)
+    
+    def confirmation_yes_or_no(self):
+        result =  QMessageBox.question(self, "Confirm Action", "Are you sure you want to clear all logs ?", QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No)
+        if result == QMessageBox.StandardButton.Yes:
+            self.ui.logsView.clear()
+            self.update_logs("Logs Cleared!\n")
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
