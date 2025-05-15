@@ -112,7 +112,7 @@ class Firewall:
         self.signals.log_added.emit(log_message)
         
         try:
-            with open('firewall.log', 'a') as f:
+            with open('firewall.txt', 'a') as f:
                 f.write(log_message + '\n')
         except Exception as e:
             print(f"Error writing to log file: {e}")
