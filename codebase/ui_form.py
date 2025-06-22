@@ -1,5 +1,3 @@
-
-
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
     QSize, QTime, QUrl, Qt)
@@ -248,6 +246,15 @@ class Ui_MainWindow(object):
         self.logsView.setReadOnly(True)
 
         self.verticalLayout_3.addWidget(self.logsView)
+
+        self.popupLogsView = QPlainTextEdit(self.widget)
+        self.popupLogsView.setObjectName(u"popupLogsView")
+        self.popupLogsView.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.popupLogsView.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.popupLogsView.setReadOnly(True)
+        self.popupLogsView.setPlaceholderText("Popup client logs will show here...")
+
+        self.verticalLayout_3.addWidget(self.popupLogsView)
 
         self.logViewDesc = QTextEdit(self.widget)
         self.logViewDesc.setObjectName(u"logViewDesc")

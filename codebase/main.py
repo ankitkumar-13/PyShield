@@ -1,10 +1,10 @@
 import sys
 from mainwindow import QApplication, MainWindow
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QWidget, QVBoxLayout, QLabel, QPushButton
 import socket
 import threading
-from scapy.all import sniff, IP, TCP, UDP
+from scapy.all import sniff, IP, TCP, UDP, Raw
 import subprocess
 from threading import Timer
 import datetime
@@ -13,6 +13,10 @@ import os
 
 class FirewallSignals(QObject):
     log_added = Signal(str)
+
+# Add this for popup log signals
+class PopupSignals(QObject):
+    popup_log = Signal(str)
 
 class Firewall:
     def __init__(self, signals):
@@ -220,16 +224,73 @@ class Firewall:
         except Exception as e:
             print(f"Error writing to log file: {e}")
 
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Doesn't have to be reachable
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip
+
+# --- Popup Client Implementation ---
+class PopupClient(QWidget):
+    FAKE_IPS = ['10.0.0.1', '10.0.0.2', '10.0.0.3']
+    def __init__(self, pc_number, server_host=None, server_port=50505):
+        super().__init__()
+        self.pc_number = pc_number
+        self.fake_ip = self.FAKE_IPS[pc_number-1]
+        if server_host is None:
+            self.server_host = get_local_ip()
+        else:
+            self.server_host = server_host
+        self.server_port = server_port
+        self.setWindowTitle(f"PC Client {pc_number}")
+        self.setGeometry(200 + 60 * pc_number, 200 + 60 * pc_number, 250, 120)
+        layout = QVBoxLayout()
+        self.label = QLabel(f"PC Client {pc_number}\nSource IP: {self.fake_ip}\nTarget: {self.server_host}:{self.server_port}")
+        layout.addWidget(self.label)
+        self.button = QPushButton("Send Packet")
+        self.button.clicked.connect(self.send_packet)
+        layout.addWidget(self.button)
+        self.setLayout(layout)
+
+    def send_packet(self):
+        msg = f"PC{self.pc_number} ({self.fake_ip}): Hello from client {self.pc_number}!"
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # Include the fake_ip in the message for udp_server to parse
+            sock.sendto(f"{self.fake_ip}|{msg}".encode(), (self.server_host, self.server_port))
+            sock.close()
+        except Exception as e:
+            QMessageBox.warning(self, "Send Failed", str(e))
+
+# --- MainWindowExtended changes ---
 class MainWindowExtended(MainWindow):
     def __init__(self):
         super().__init__()
         self.firewall_signals = FirewallSignals()
         self.firewall = Firewall(self.firewall_signals)
-        
         self.firewall_signals.log_added.connect(self.update_logs)
         self.ui.pushButton_5.clicked.connect(self.add_rule)
         self.ui.pushButton_4.clicked.connect(self.confirmation_yes_or_no)
-        
+        # Popup log signal
+        self.popup_signals = PopupSignals()
+        self.popup_signals.popup_log.connect(self.update_popup_logs)
+        # Start UDP server for popups
+        self.udp_server_port = 50505
+        self.udp_server_thread = threading.Thread(target=self.udp_server, daemon=True)
+        self.udp_server_thread.start()
+        # Launch 3 popup clients
+        self.popup_clients = []
+        for i in range(1, 4):
+            popup = PopupClient(i, server_port=self.udp_server_port)
+            popup.show()
+            self.popup_clients.append(popup)
+
     def start_firewall(self):
         super().start_firewall()
         self.firewall.start()
@@ -265,6 +326,31 @@ class MainWindowExtended(MainWindow):
         if result == QMessageBox.StandardButton.Yes:
             self.ui.logsView.clear()
             self.update_logs("Logs Cleared!\n")
+
+    def update_popup_logs(self, message):
+        self.ui.popupLogsView.appendPlainText(message)
+
+    def udp_server(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(('', self.udp_server_port))
+        while True:
+            try:
+                data, addr = sock.recvfrom(1024)
+                msg = data.decode(errors='replace')
+                # Parse fake_ip and actual message
+                if '|' in msg:
+                    fake_ip, real_msg = msg.split('|', 1)
+                else:
+                    fake_ip, real_msg = addr[0], msg
+                # Show original format in lower window with fake IP only
+                popup_log_msg = f"[PopupClient {fake_ip}]: {real_msg}"
+                self.popup_signals.popup_log.emit(popup_log_msg)
+                # Simulate a Scapy UDP packet for the firewall with fake IP
+                fake_pkt = IP(src=fake_ip, dst=get_local_ip())/UDP(sport=addr[1], dport=self.udp_server_port)/Raw(load=real_msg.encode())
+                self.firewall.packet_handler(fake_pkt)
+            except Exception as e:
+                # Optionally log errors
+                pass
 
 if __name__ == "__main__":
     if os.name == 'nt':  # Windows
